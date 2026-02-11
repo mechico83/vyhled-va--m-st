@@ -3,30 +3,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBtn = document.getElementById('searchBtn');
     const resultsContainer = document.getElementById('resultsContainer');
 
-    // 2. Asynchronní stažení dat pomocí fetch() s dvojitým záchranným systémem
+    // 2. Asynchronní stažení dat pomocí fetch() z GitHub Gist (obejití CORS a 403 API)
     async function fetchPickupPoints() {
-        const targetUrl = 'https://www.zasilkovna.cz/api/v4/branch.json';
-        const backupProxyUrl = 'https://api.codetabs.com/v1/proxy?quest=' + targetUrl;
+        const targetUrl = 'https://gist.githubusercontent.com/mechico83/43a864a9904b26d4c38d1f6519e32272/raw/3bbc6e0cc65f82f5d436b4a5d1de79a206e00070/pobocky.json';
 
         try {
-            // 1. Pokus: Přímé spojení
             const response = await fetch(targetUrl);
-            if (!response.ok) throw new Error(`Direct fetch failed: ${response.status}`);
-            const json = await response.json();
-            return json.data || [];
-        } catch (error) {
-            console.warn("Direct fetch failed, trying backup proxy...", error);
 
-            try {
-                // 2. Pokus: Záložní proxy (CodeTabs)
-                const response = await fetch(backupProxyUrl);
-                if (!response.ok) throw new Error(`Backup proxy failed: ${response.status}`);
-                const json = await response.json();
-                return json.data || [];
-            } catch (backupError) {
-                console.error("Backup proxy also failed.", backupError);
-                throw backupError; // Propagate error to handleSearch catch block
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+
+            // GitHub Gist vrací JSON přímo (buď pole, nebo wrapper)
+            // Předpokládáme stejnou strukturu jako Zásilkovna, nebo se přizpůsobíme.
+            // Pokud je to raw dump Zásilkovny, bude to mít klíč "data": [...]
+            // Pokud je to pole, vrátíme přímo json.
+            const json = await response.json();
+
+            return json.data || (Array.isArray(json) ? json : []);
+        } catch (error) {
+            console.error("Fetch error:", error);
+            throw error;
         }
     }
 
@@ -38,20 +35,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        resultsContainer.innerHTML = '<div class="loading">Načítám data z API...</div>';
+        resultsContainer.innerHTML = '<div class="loading">Načítám data...</div>';
 
         try {
             const rawData = await fetchPickupPoints();
 
             // 3. Logika zpracování dat (Mapping & Filtering)
-            // Musíme namapovat data z API na náš formát
-            // Zásilkovna API item example (simplified): { place: "Z-BOX ...", name: "...", street: "...", city: "..." }
+            // Mapování dat pro jednotný formát
+            // Očekáváme klíče jako Zásilkovna: place, name, city, street
 
             const normalizedData = rawData.map(item => ({
                 place: item.place,
                 name: item.name,
                 city: item.city,
-                address: item.street
+                address: item.street || item.address // Fallback if Gist uses different key
             }));
 
             // Filtrování podle města (case-insensitive)
@@ -75,10 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Chyba při stahování dat:", error);
 
-            let errorMessage = 'Chyba připojení k serveru Zásilkovny. Data se nepodařilo načíst.';
-
-            // Hint about adblockers blocking proxies
-            errorMessage += ' (Zkontrolujte připojení nebo AdBlock)';
+            let errorMessage = 'Chyba připojení k datovému zdroji. Data se nepodařilo načíst.';
 
             resultsContainer.innerHTML = `<div class="error-message">${errorMessage}</div>`;
         }
