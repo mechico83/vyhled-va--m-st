@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vyhledávač výdejních míst</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Najdi své výdejní místo</h1>
+            <p>Zadejte město a my vám zobrazíme dostupné možnosti.</p>
+        </header>
+
+        <main>
+            <div class="search-box">
+                <input type="text" id="cityInput" placeholder="Zadejte město (např. Praha, Brno)...">
+                <button id="searchBtn">Hledat</button>
+            </div>
+
+            <div id="resultsContainer" class="results-grid">
+                <!-- Výsledky se načtou zde -->
+                <div class="placeholder-message">Zatím jste nic nehledali.</div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
