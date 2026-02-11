@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const json = await response.json();
 
-            // 1. Debug log pro kontrolu stažených dat
+            // Debug log pro kontrolu stažených dat
             console.log('Stažená data:', json);
 
             return json.data || (Array.isArray(json) ? json : []);
@@ -40,34 +40,24 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const rawData = await fetchPickupPoints();
 
-            // Mapování dat pro jednotný formát
-            const normalizedData = rawData.map(item => ({
-                place: item.place,
-                name: item.name,
-                city: item.city,
-                address: item.street || item.address
-            }));
+            // 3. Logika zpracování dat (Přímo s rawData, žádné mapování)
 
-            // 2. & 3. Bezpečné filtrování (substring, case-insensitive)
-            const filteredByQuery = normalizedData.filter(item => {
-                // Bezpečné získání stringů (fallback na prázdný string)
+            // 2. Filtrování (place obsahuje term NEBO name obsahuje term)
+            const filteredByQuery = rawData.filter(item => {
                 const placeStr = (item.place || '').toLowerCase();
                 const nameStr = (item.name || '').toLowerCase();
-                // Pro jistotu necháme i město, kdyby uživatel hledal město
-                const cityStr = (item.city || '').toLowerCase();
 
-                // Podmínka: place obsahuje term NEBO name obsahuje term NEBO city obsahuje term
-                return placeStr.includes(term) || nameStr.includes(term) || cityStr.includes(term);
+                return placeStr.includes(term) || nameStr.includes(term);
             });
 
-            // Deduplikace podle adresy
-            const uniqueAddresses = new Set();
+            // 3. Deduplikace podle názvu (protože name obsahuje adresu v Gistu)
+            const uniqueNames = new Set();
             const uniqueResults = filteredByQuery.filter(item => {
-                const address = item.address;
-                if (!address || uniqueAddresses.has(address)) {
+                const name = item.name;
+                if (!name || uniqueNames.has(name)) {
                     return false;
                 }
-                uniqueAddresses.add(address);
+                uniqueNames.add(name);
                 return true;
             });
 
@@ -94,13 +84,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'result-card';
 
-            // 1. Priorita: 'place' > 'name' (fallback)
+            // 1. Priorita: 'place' > 'name' (fallback, i když name je použito i jako adresa)
             const title = point.place ? point.place : point.name;
 
+            // 4. Renderování: title jako H3, name jako adresa
             card.innerHTML = `
                 <h3>${title}</h3>
-                <p>${point.address}</p>
-                <p style="font-size: 0.85em; opacity: 0.7; margin-top: 5px;">${point.city}</p>
+                <p>${point.name}</p> 
             `;
 
             resultsContainer.appendChild(card);
