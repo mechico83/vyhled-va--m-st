@@ -3,31 +3,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBtn = document.getElementById('searchBtn');
     const resultsContainer = document.getElementById('resultsContainer');
 
-    // 2. Asynchronní stažení dat pomocí fetch() z veřejného API Zásilkovny přes CORS proxy
+    // 2. Asynchronní stažení dat pomocí fetch() s dvojitým záchranným systémem
     async function fetchPickupPoints() {
-        // Použijeme api.allorigins.win pro obejití CORS
-        // URL Zásilkovny: https://www.zasilkovna.cz/api/v4/branch.json
-        const proxyUrl = 'https://api.allorigins.win/raw?url=';
         const targetUrl = 'https://www.zasilkovna.cz/api/v4/branch.json';
-
-        // Sestavení URL: proxy + enkódované cílové URL
-        const finalUrl = proxyUrl + encodeURIComponent(targetUrl);
+        const backupProxyUrl = 'https://api.codetabs.com/v1/proxy?quest=' + targetUrl;
 
         try {
-            const response = await fetch(finalUrl);
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
+            // 1. Pokus: Přímé spojení
+            const response = await fetch(targetUrl);
+            if (!response.ok) throw new Error(`Direct fetch failed: ${response.status}`);
             const json = await response.json();
-
-            // API Zásilkovny vrací objekt { "data": [ ... ] }
             return json.data || [];
-        } catch (e) {
-            // Fallback pro případ, že proxy nefunguje nebo je blokováno adblockem
-            console.warn("Primary proxy failed, trying backup...", e);
-            throw e;
+        } catch (error) {
+            console.warn("Direct fetch failed, trying backup proxy...", error);
+
+            try {
+                // 2. Pokus: Záložní proxy (CodeTabs)
+                const response = await fetch(backupProxyUrl);
+                if (!response.ok) throw new Error(`Backup proxy failed: ${response.status}`);
+                const json = await response.json();
+                return json.data || [];
+            } catch (backupError) {
+                console.error("Backup proxy also failed.", backupError);
+                throw backupError; // Propagate error to handleSearch catch block
+            }
         }
     }
 
