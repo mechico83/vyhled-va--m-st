@@ -5,9 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. Asynchronní stažení dat pomocí fetch() z veřejného API Zásilkovny přes CORS proxy
     async function fetchPickupPoints() {
-        // Použijeme corsproxy.io pro obejití CORS
+        // Použijeme api.allorigins.win pro obejití CORS
         // URL Zásilkovny: https://www.zasilkovna.cz/api/v4/branch.json
-        const proxyUrl = 'https://corsproxy.io/?';
+        const proxyUrl = 'https://api.allorigins.win/raw?url=';
         const targetUrl = 'https://www.zasilkovna.cz/api/v4/branch.json';
 
         // Sestavení URL: proxy + enkódované cílové URL
@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // API Zásilkovny vrací objekt { "data": [ ... ] }
             return json.data || [];
         } catch (e) {
-            // Fallback pro případ, že corsproxy.io nefunguje nebo je blokováno adblockem
+            // Fallback pro případ, že proxy nefunguje nebo je blokováno adblockem
             console.warn("Primary proxy failed, trying backup...", e);
             throw e;
         }
@@ -78,8 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let errorMessage = 'Chyba připojení k serveru Zásilkovny. Data se nepodařilo načíst.';
 
-            // Check if we are on https to warn about mixed content if proxy is http (unlikely for corsproxy.io)
-            // Also hint about adblockers blocking proxies
+            // Hint about adblockers blocking proxies
             errorMessage += ' (Zkontrolujte připojení nebo AdBlock)';
 
             resultsContainer.innerHTML = `<div class="error-message">${errorMessage}</div>`;
