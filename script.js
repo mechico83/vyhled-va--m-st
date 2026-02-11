@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBtn = document.getElementById('searchBtn');
     const resultsContainer = document.getElementById('resultsContainer');
 
-    // 2. Asynchronní stažení dat pomocí fetch() z GitHub Gist (obejití CORS a 403 API)
+    // 2. Asynchronní stažení dat pomocí fetch() z GitHub Gist
     async function fetchPickupPoints() {
         const targetUrl = 'https://gist.githubusercontent.com/mechico83/43a864a9904b26d4c38d1f6519e32272/raw/3bbc6e0cc65f82f5d436b4a5d1de79a206e00070/pobocky.json';
 
@@ -14,10 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            // GitHub Gist vrací JSON přímo (buď pole, nebo wrapper)
-            // Předpokládáme stejnou strukturu jako Zásilkovna, nebo se přizpůsobíme.
-            // Pokud je to raw dump Zásilkovny, bude to mít klíč "data": [...]
-            // Pokud je to pole, vrátíme přímo json.
             const json = await response.json();
 
             // 1. Debug log pro kontrolu stažených dat
@@ -31,10 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleSearch() {
-        // 2. Striktní převod na malá písmena pro query
-        const query = cityInput.value.trim().toLowerCase();
+        // 1. Oříznutí a lowercased hledaný výraz
+        const term = cityInput.value.trim().toLowerCase();
 
-        if (!query) {
+        if (!term) {
             resultsContainer.innerHTML = '<div class="message">Zadejte prosím město pro vyhledávání.</div>';
             return;
         }
@@ -44,25 +40,24 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const rawData = await fetchPickupPoints();
 
-            // 3. Logika zpracování dat (Mapping & Filtering)
             // Mapování dat pro jednotný formát
-            // Očekáváme klíče jako Zásilkovna: place, name, city, street
-
             const normalizedData = rawData.map(item => ({
                 place: item.place,
                 name: item.name,
                 city: item.city,
-                address: item.street || item.address // Fallback if Gist uses different key
+                address: item.street || item.address
             }));
 
-            // Filtrování podle města, názvu nebo místa (case-insensitive)
+            // 2. & 3. Bezpečné filtrování (substring, case-insensitive)
             const filteredByQuery = normalizedData.filter(item => {
-                // Check all relevant fields safely
-                const matchCity = item.city && item.city.toLowerCase().includes(query);
-                const matchPlace = item.place && item.place.toLowerCase().includes(query);
-                const matchName = item.name && item.name.toLowerCase().includes(query);
+                // Bezpečné získání stringů (fallback na prázdný string)
+                const placeStr = (item.place || '').toLowerCase();
+                const nameStr = (item.name || '').toLowerCase();
+                // Pro jistotu necháme i město, kdyby uživatel hledal město
+                const cityStr = (item.city || '').toLowerCase();
 
-                return matchCity || matchPlace || matchName;
+                // Podmínka: place obsahuje term NEBO name obsahuje term NEBO city obsahuje term
+                return placeStr.includes(term) || nameStr.includes(term) || cityStr.includes(term);
             });
 
             // Deduplikace podle adresy
