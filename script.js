@@ -20,6 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Pokud je to pole, vrátíme přímo json.
             const json = await response.json();
 
+            // 1. Debug log pro kontrolu stažených dat
+            console.log('Stažená data:', json);
+
             return json.data || (Array.isArray(json) ? json : []);
         } catch (error) {
             console.error("Fetch error:", error);
@@ -28,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleSearch() {
+        // 2. Striktní převod na malá písmena pro query
         const query = cityInput.value.trim().toLowerCase();
 
         if (!query) {
@@ -51,14 +55,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 address: item.street || item.address // Fallback if Gist uses different key
             }));
 
-            // Filtrování podle města (case-insensitive)
-            const filteredByCity = normalizedData.filter(item =>
-                item.city && item.city.toLowerCase().includes(query)
-            );
+            // Filtrování podle města, názvu nebo místa (case-insensitive)
+            const filteredByQuery = normalizedData.filter(item => {
+                // Check all relevant fields safely
+                const matchCity = item.city && item.city.toLowerCase().includes(query);
+                const matchPlace = item.place && item.place.toLowerCase().includes(query);
+                const matchName = item.name && item.name.toLowerCase().includes(query);
+
+                return matchCity || matchPlace || matchName;
+            });
 
             // Deduplikace podle adresy
             const uniqueAddresses = new Set();
-            const uniqueResults = filteredByCity.filter(item => {
+            const uniqueResults = filteredByQuery.filter(item => {
                 const address = item.address;
                 if (!address || uniqueAddresses.has(address)) {
                     return false;
