@@ -3,50 +3,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchBtn = document.getElementById('searchBtn');
     const resultsContainer = document.getElementById('resultsContainer');
 
-    // Mock data pro offline testování přes fetch (data URI)
-    const mockData = [
-        { id: 1, city: "Praha", address: "Václavské náměstí 1, Praha 1", place: "AlzaBox", name: "AlzaBox Václavák" },
-        { id: 2, city: "Praha 2", address: "Vinohradská 10, Praha 2", name: "Potraviny u Nováků" }, // place chybí
-        { id: 3, city: "Brno", address: "náměstí Svobody 5, Brno", place: "Zásilkovna", name: "Z-BOX Náměstí" },
-        { id: 4, city: "Praha 1", address: "Václavské náměstí 1, Praha 1", place: "AlzaBox 2", name: "Duplicate Address Test" }, // Duplicitní adresa, měla by být odstraněna
-        { id: 5, city: "Ostrava", address: "Masarykovo náměstí 3, Ostrava", place: "PPL ParcelShop", name: "Trafika Centrum" },
-        { id: 6, city: "Brno", address: "Masarykova 12, Brno", name: "Květinářství Hana" },
-        { id: 7, city: "Plzeň", address: "Americká 42, Plzeň", place: "GLS ParcelShop", name: "Elektro Novák" },
-        { id: 8, city: "Liberec", address: "Soukenné náměstí 1, Liberec", place: "DPD Pickup", name: "Papírnictví" },
-        { id: 9, city: "Praha 2", address: "Karlovo náměstí 10, Praha 2", place: "Z-BOX", name: "Box Nemocnice" }
-    ];
-
-    // Vytvoření Data URI pro simulaci fetch
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(mockData));
-
+    // 2. Asynchronní stažení dat pomocí fetch() z veřejného API Zásilkovny přes CORS proxy
     async function fetchPickupPoints() {
-        // Zde používáme fetch s data URI, což je technicky fetch, ale funguje offline/lokálně
-        const response = await fetch(dataUri);
+        // Použijeme corsproxy.io pro obejití CORS
+        // URL Zásilkovny: https://www.zasilkovna.cz/api/v4/branch.json
+        const proxyUrl = 'https://corsproxy.io/?';
+        const targetUrl = 'https://www.zasilkovna.cz/api/v4/branch.json';
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        // Sestavení URL: proxy + enkódované cílové URL
+        const finalUrl = proxyUrl + encodeURIComponent(targetUrl);
+
+        try {
+            const response = await fetch(finalUrl);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const json = await response.json();
+
+            // API Zásilkovny vrací objekt { "data": [ ... ] }
+            return json.data || [];
+        } catch (e) {
+            // Fallback pro případ, že corsproxy.io nefunguje nebo je blokováno adblockem
+            console.warn("Primary proxy failed, trying backup...", e);
+            throw e;
         }
-
-        return await response.json();
     }
 
     async function handleSearch() {
         const query = cityInput.value.trim().toLowerCase();
 
-        // Pokud je pole prázdné, vyzveme uživatele
         if (!query) {
             resultsContainer.innerHTML = '<div class="message">Zadejte prosím město pro vyhledávání.</div>';
             return;
         }
 
-        resultsContainer.innerHTML = '<div class="loading">Načítám data...</div>';
+        resultsContainer.innerHTML = '<div class="loading">Načítám data z API...</div>';
 
         try {
-            const data = await fetchPickupPoints();
+            const rawData = await fetchPickupPoints();
 
-            // 3. Logika zpracování dat (Filtrování)
-            // Filtrujeme podle města (case-insensitive)
-            const filteredByCity = data.filter(item =>
+            // 3. Logika zpracování dat (Mapping & Filtering)
+            // Musíme namapovat data z API na náš formát
+            // Zásilkovna API item example (simplified): { place: "Z-BOX ...", name: "...", street: "...", city: "..." }
+
+            const normalizedData = rawData.map(item => ({
+                place: item.place,
+                name: item.name,
+                city: item.city,
+                address: item.street
+            }));
+
+            // Filtrování podle města (case-insensitive)
+            const filteredByCity = normalizedData.filter(item =>
                 item.city && item.city.toLowerCase().includes(query)
             );
 
@@ -66,12 +76,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Chyba při stahování dat:", error);
 
-            let errorMessage = 'Chyba připojení k serveru. Data se nepodařilo načíst.';
-            if (window.location.protocol === 'file:') {
-                errorMessage = 'Chyba: Aplikaci nelze spustit přímo ze souboru (CORS politika prohlížeče). Prosím, spusťte ji přes lokální server (např. VS Code Live Server).';
-            }
+            let errorMessage = 'Chyba připojení k serveru Zásilkovny. Data se nepodařilo načíst.';
 
-            // 3. (Fallback) Výpis chybové hlášky červeně
+            // Check if we are on https to warn about mixed content if proxy is http (unlikely for corsproxy.io)
+            // Also hint about adblockers blocking proxies
+            errorMessage += ' (Zkontrolujte připojení nebo AdBlock)';
+
             resultsContainer.innerHTML = `<div class="error-message">${errorMessage}</div>`;
         }
     }
@@ -80,7 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContainer.innerHTML = '';
 
         if (points.length === 0) {
-            // 3. Zpráva, pokud se nic nenašlo
             resultsContainer.innerHTML = '<div class="no-results">Nebylo nalezeno žádné výdejní místo.</div>';
             return;
         }
@@ -92,8 +101,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // 1. Priorita: 'place' > 'name' (fallback)
             const title = point.place ? point.place : point.name;
 
-            // Zajištění bezpečného výpisu (XSS prevence není v zadání explicitně, ale textContent je bezpečnější než innerHTML pro data)
-            // Zde pro jednoduchost a formátování použijeme innerHTML šablonu
             card.innerHTML = `
                 <h3>${title}</h3>
                 <p>${point.address}</p>
